@@ -115,7 +115,7 @@ export default function ContractReviewPage() {
         ) : (
           <div
             ref={outputRef}
-            className="whitespace-pre-wrap bg-white border rounded-lg p-4 shadow-inner w-full max-w-3xl min-h-[200px] overflow-y-auto text-sm text-gray-800"
+            className="whitespace-pre-wrap bg-white border rounded-lg p-4 shadow-inner w-full max-w-3xl max-h-170 min-h-[200px] overflow-y-auto text-sm text-gray-800 pb-36"
           >
             {loading ? <Spin tip="评审中，请稍候..." /> : <Paragraph>{responseText || "返回内容将显示在此处..."}</Paragraph>}
           </div>
