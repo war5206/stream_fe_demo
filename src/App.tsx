@@ -1,15 +1,17 @@
 import { useState, useRef } from "react";
-import { FileAddOutlined, SendOutlined, FileWordOutlined, FilePdfOutlined } from "@ant-design/icons";
-import { Button, Input, Upload, message, Typography, Spin } from "antd";
+import { FileAddOutlined, SendOutlined, FileWordOutlined, FilePdfOutlined, UpOutlined, DownOutlined } from "@ant-design/icons";
+import { Button, Input, Upload, message, Spin } from "antd";
+import ReactMarkdown from "react-markdown";
 import type { RcFile } from "antd/es/upload";
 
 const { TextArea } = Input;
-const { Paragraph } = Typography;
 
 export default function ContractReviewPage() {
   const [input, setInput] = useState("");
-  const [responseText, setResponseText] = useState("");
+  const [messages, setMessages] = useState<{ type: string; content: string }[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isReasoningDone, setIsReasoningDone] = useState(false);
+  const [showReasoning, setShowReasoning] = useState(true);
   const [file, setFile] = useState<RcFile | null>(null);
   const [showIntro, setShowIntro] = useState(true);
   const outputRef = useRef<HTMLDivElement>(null);
@@ -21,13 +23,7 @@ export default function ContractReviewPage() {
     "请简要总结合同的重点条款"
   ];
 
-  const handleQuickPrompt = (prompt: string) => {
-    setInput(prompt);
-  };
-
-  const handleFileRemove = () => {
-    setFile(null);
-  };
+  const handleFileRemove = () => setFile(null);
 
   const handleBeforeUpload = (file: RcFile) => {
     const isSupported = /\.(pdf|doc|docx)$/i.test(file.name);
@@ -46,7 +42,16 @@ export default function ContractReviewPage() {
     return false;
   };
   
-  
+  const typeText = async (
+    text: string,
+    update: (char: string) => void,
+    delay = 20 // 每个字符间隔，单位：ms
+  ) => {
+    for (const char of text) {
+      update(char);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  };
   
   const handleSubmit = async () => {
     if (!input.trim()) return;
@@ -54,43 +59,101 @@ export default function ContractReviewPage() {
       message.error("请上传合同文件");
       return;
     }
-
+  
     const formData = new FormData();
     formData.append("file", file);
     formData.append("user_prompt", input);
-
+    formData.append("user_id", "1");
+    formData.append("agent_id", "1");
+  
+    setMessages(prev => [...prev, { type: "user", content: input }]);
+    setInput("");
     setLoading(true);
     setShowIntro(false);
-    setResponseText("");
-
+    setIsReasoningDone(false); // 思考开始
+  
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/v1/rag_contract_review_stream", {
+      const res = await fetch("http://127.0.0.1:8000/api/v1/contract/review", {
         method: "POST",
         body: formData,
       });
-
+  
       const reader = res.body?.getReader();
       const decoder = new TextDecoder("utf-8");
-
-      if (!reader) throw new Error("无法读取响应流");
-
+      if (!reader) throw new Error("响应流不可用");
+  
+      let buffer = "";
+      let reasoning = "";
+      let answer = "";
       let done = false;
+  
       while (!done) {
-        const { value, done: doneReading } = await reader.read();
-        done = doneReading;
-        const chunk = decoder.decode(value);
-        setResponseText((prev) => prev + chunk);
-
+        const { value, done: readDone } = await reader.read();
+        done = readDone;
+        if (value) {
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+  
+          for (const line of lines) {
+            if (!line.trim()) continue;
+  
+            try {
+              const data = JSON.parse(line);
+              const delta = data.delta ?? "";
+  
+              if (data.type === "reasoning") {
+                const newPiece = delta.startsWith(reasoning) ? delta.slice(reasoning.length) : delta;
+                await typeText(newPiece, (char) => {
+                  reasoning += char;
+                  setMessages(prev => [
+                    ...prev.filter(m => m.type !== "reasoning"),
+                    { type: "reasoning", content: reasoning }
+                  ]);
+                });
+              }
+  
+              else if (data.type === "message") {
+                setIsReasoningDone(true); // 思考完成
+                const newPiece = delta.startsWith(answer) ? delta.slice(answer.length) : delta;
+                await typeText(newPiece, (char) => {
+                  answer += char;
+                  setMessages(prev => [
+                    ...prev.filter(m => m.type !== "message"),
+                    { type: "message", content: answer }
+                  ]);
+                });
+              }
+  
+              else if (data.type === "stop") {
+                console.log("AI 回复完成");
+              }
+  
+              else if (data.type === "error") {
+                message.error("AI 错误：" + delta);
+              }
+  
+            } catch (err) {
+              console.warn("无法解析数据:", line, err);
+            }
+          }
+        }
+  
         if (outputRef.current) {
           outputRef.current.scrollTop = outputRef.current.scrollHeight;
         }
       }
+  
     } catch (err) {
-      setResponseText("请求失败，请稍后再试。");
+      console.error(err);
+      message.error("请求失败，请稍后再试。");
     } finally {
       setLoading(false);
     }
   };
+  
+  
+  
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
@@ -105,7 +168,7 @@ export default function ContractReviewPage() {
                 <div
                   className="w-70 h-10 leading-10 text-left pl-5 rounded-xl text-gray-800 bg-gray-100 hover:bg-gray-200 text-sm cursor-pointer"
                   key={prompt}
-                  onClick={() => handleQuickPrompt(prompt)}
+                  onClick={() => setInput(prompt)}
                 >
                   {prompt}
                 </div>
@@ -117,7 +180,49 @@ export default function ContractReviewPage() {
             ref={outputRef}
             className="whitespace-pre-wrap bg-white border rounded-lg p-4 shadow-inner w-full max-w-3xl max-h-170 min-h-[200px] overflow-y-auto text-sm text-gray-800 pb-36"
           >
-            {loading ? <Spin tip="评审中，请稍候..." /> : <Paragraph>{responseText || "返回内容将显示在此处..."}</Paragraph>}
+            {messages.map((msg, idx) => (
+              <div key={idx}>
+                {msg.type === "user" && (
+                  <div className="mb-2 text-sm text-right">
+                    <div className="inline-block bg-blue-100 text-blue-800 px-3 py-2 rounded-lg max-w-[70%]">
+                      {msg.content}
+                    </div>
+                  </div>
+                )}
+                {msg.type === "reasoning" && (
+                  <div className="mb-2 text-sm text-left">
+                    <div className="border-l-4 border-gray-300 pl-3 pr-2 pt-2 pb-1 bg-gray-50 rounded-md">
+                      <div className="flex items-center text-xs font-medium text-gray-500 mb-1 gap-1">
+                        <span>{isReasoningDone ? "已深度思考" : "正在思考中..."}</span>
+                        <button
+                          className="text-gray-400 hover:text-gray-600 transition"
+                          onClick={() => setShowReasoning(prev => !prev)}
+                          title={showReasoning ? "收起" : "展开"}
+                        >
+                          {showReasoning ? <UpOutlined /> : <DownOutlined />}
+                        </button>
+                      </div>
+
+                      {showReasoning && (
+                        <div className="text-gray-600 text-sm prose prose-sm whitespace-pre-wrap">
+                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+
+                {msg.type === "message" && (
+                  <div className="mb-2 text-sm text-left">
+                    <div className="inline-block bg-green-100 text-green-800 px-3 py-2 rounded-lg max-w-[100%]">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            {loading && <Spin tip="评审中，请稍候..." />}
           </div>
         )}
       </div>
