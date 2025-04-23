@@ -2,10 +2,14 @@ import React, { useState, useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import Home from './pages/Home'
-import AgentChat from './pages/AgentChat'
+import ContractReview from './pages/ContractReview'
+import BidConsult from './pages/BidConsult'
+import TechConsult from './pages/TechConsult'
+import SalesConsult from './pages/SalesConsult'
 import UserProfile from './pages/UserProfile'
 import Favorites from './pages/Favorites'
 import Profile from './pages/Profile'
+import ContractViewer from './pages/ContractViewer'
 
 const App: React.FC = () => {
   // <768px 默认折叠，>=768px 默认展开
@@ -35,13 +39,8 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col md:flex-row h-screen">
-      {/* 侧边栏 */}
-      <Sidebar
-        isCollapsed={isCollapsed}
-        onToggle={toggleCollapse}
-      />
+      <Sidebar isCollapsed={isCollapsed} onToggle={toggleCollapse} />
 
-      {/* 收起后的图标 */}
       {isCollapsed && (
         <div className="fixed top-4 left-4 z-20">
           <div
@@ -53,7 +52,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* 主视图区 */}
       <main
         className={`
           flex-1 transition-all duration-300 ease-in-out
@@ -63,10 +61,14 @@ const App: React.FC = () => {
       >
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/agent/:id" element={<AgentChat />} />
-          <Route path="/user" element={<UserProfile />} />
-          <Route path="/favorites" element={<Favorites />} />
-          <Route path="/profile" element={<Profile />} />
+          <Route path="/agent/contract" element={<ContractReview />} />
+          <Route path="/agent/contract/view" element={<ContractViewer />} />
+          <Route path="/agent/bid"      element={<BidConsult />} />
+          <Route path="/agent/tech"     element={<TechConsult />} />
+          <Route path="/agent/sales"    element={<SalesConsult />} />
+          <Route path="/user"           element={<UserProfile />} />
+          <Route path="/favorites"      element={<Favorites />} />
+          <Route path="/profile"        element={<Profile />} />
         </Routes>
       </main>
     </div>

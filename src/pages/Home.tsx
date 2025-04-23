@@ -13,14 +13,14 @@ const Home: React.FC = () => {
   const nav = useNavigate()
 
   return (
-    <div className="h-full flex justify-center items-start p-6">
+    <div className="h-full flex justify-center items-center p-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-3xl">
-        {agents.map(a => (
-          <div
-            key={a.id}
-            className="cursor-pointer"
-            onPointerDown={() => nav(`/agent/${a.id}`)}
-          >
+      {agents.map(a => (
+        <div
+          key={a.id}
+          className="cursor-pointer"
+          onPointerDown={() => nav(`/agent/${a.id}`)}
+        >
             <AgentCard title={a.title} description={a.description} />
           </div>
         ))}
