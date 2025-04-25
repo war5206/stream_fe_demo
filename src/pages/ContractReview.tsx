@@ -1,22 +1,13 @@
-// src/pages/ContractReview.tsx
-import React, { useState, useRef, DragEvent, ChangeEvent } from 'react'
-import ReactMarkdown from 'react-markdown'
-import { ArrowUpTrayIcon } from '@heroicons/react/24/outline'
-
-interface StreamData {
-  type: 'reasoning' | 'message' | 'error'
-  delta?: string
-}
+import { useState, DragEvent, ChangeEvent, useRef, useEffect } from 'react'
+import MarkdownPreview from '@uiw/react-markdown-preview'
 
 export default function ContractReview() {
   const [file, setFile] = useState<File | null>(null)
   const [loading, setLoading] = useState(false)
-  const [messages, setMessages] = useState<
-    { type: 'reasoning' | 'message'; content: string }[]
-  >([])
+  const [summary, setSummary] = useState<string>('')
+  const [showBackToBottom, setShowBackToBottom] = useState(false)
   const outputRef = useRef<HTMLDivElement>(null)
 
-  // 通用上传处理，触发评审
   const handleFile = (f: File) => {
     if (!/\.(pdf|docx)$/i.test(f.name)) {
       alert('只支持 PDF 或 DOCX 格式')
@@ -26,20 +17,17 @@ export default function ContractReview() {
     startReview(f)
   }
 
-  // 拖拽
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     const f = e.dataTransfer.files[0]
     if (f) handleFile(f)
   }
 
-  // 选择文件
   const onSelect = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (f) handleFile(f)
   }
 
-  // 调用后端并处理流式返回
   const startReview = async (f: File) => {
     const formData = new FormData()
     formData.append('file', f)
@@ -48,82 +36,65 @@ export default function ContractReview() {
     formData.append('agent_id', '1')
 
     setLoading(true)
-    setMessages([])
+    setSummary('')
 
     try {
       const res = await fetch('http://127.0.0.1:8000/api/v1/contract/review', {
         method: 'POST',
         body: formData,
       })
-      if (!res.body) throw new Error('响应流不可用')
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder('utf-8')
-      let buffer = ''
-      let reasoning = ''
-      let answer = ''
-      let done = false
-
-      while (!done) {
-        const { value, done: readDone } = await reader.read()
-        done = readDone
-        if (value) {
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || ''
-          for (const line of lines) {
-            if (!line.trim()) continue
-            let data: StreamData
-            try {
-              data = JSON.parse(line)
-            } catch {
-              continue
-            }
-            if (data.type === 'reasoning') {
-              const delta = data.delta || ''
-              reasoning += delta
-              setMessages(prev => [
-                ...prev.filter(m => m.type !== 'reasoning'),
-                { type: 'reasoning', content: reasoning },
-              ])
-            } else if (data.type === 'message') {
-              const delta = data.delta || ''
-              answer += delta
-              setMessages(prev => [
-                ...prev.filter(m => m.type !== 'message'),
-                { type: 'message', content: answer },
-              ])
-            } else if (data.type === 'error') {
-              console.error('后端错误：', data.delta)
-            }
-          }
-          if (outputRef.current) {
-            outputRef.current.scrollTop = outputRef.current.scrollHeight
-          }
-        }
+      const data = await res.json()
+      if (data.type === 'message') {
+        setSummary(data.delta)
       }
     } catch (err) {
       console.error(err)
-      alert('请求失败，请稍后重试')
+      alert('请求失败，请稍后再试')
     } finally {
       setLoading(false)
+      setTimeout(() => {
+        if (outputRef.current) {
+          outputRef.current.scrollTop = outputRef.current.scrollHeight
+        }
+      }, 0)
     }
+  }
+
+  useEffect(() => {
+    const div = outputRef.current
+    if (!div) return
+    const handleScroll = () => {
+      const isAtBottom = div.scrollTop + div.clientHeight >= div.scrollHeight - 20
+      setShowBackToBottom(!isAtBottom)
+    }
+    div.addEventListener('scroll', handleScroll)
+    return () => div.removeEventListener('scroll', handleScroll)
+  }, [summary])
+
+  const truncateName = (name: string) => {
+    if (name.length <= 25) return name
+    const ext = name.slice(name.lastIndexOf('.'))
+    const base = name.slice(0, 20)
+    return base + '...' + ext
   }
 
   return (
     <div className="h-full flex flex-col items-center p-6 space-y-6">
-      {/* 标题区 */}
-      <div className="text-center">
-        <h1 className="text-3xl font-bold">合同评审顾问</h1>
-        <p className="mt-2 text-gray-600">
-          帮助你审阅合同条款，给出专业建议
-        </p>
-      </div>
+      {/* 顶部标题 */}
+      {!summary && !loading && (
+        <div className="text-center">
+          <h1 className="text-3xl font-bold">合同评审顾问</h1>
+          <p className="mt-2 text-gray-600">
+            帮助你审阅合同条款，给出专业建议
+          </p>
+        </div>
+      )}
 
-      {/* 未上传时：拖拽/选择上传 */}
-      {!file && (
+      {/* 上传区域 */}
+      {!file && !loading && !summary && (
         <div
           className="w-full max-w-2xl p-6 border-2 border-dashed border-gray-300 rounded-lg
-                     flex flex-col items-center justify-center min-h-[300px]"
+                    flex flex-col items-center justify-center min-h-[300px]"
           onDragOver={e => e.preventDefault()}
           onDrop={onDrop}
         >
@@ -147,57 +118,82 @@ export default function ContractReview() {
         </div>
       )}
 
-      {/* 已上传时：消息流 */}
-      {file && (
-        <div className="w-full max-w-2xl flex flex-col">
+      {/* 加载中 */}
+      {loading && (
+        <div className="w-full max-w-2xl p-6">
+          <p className="text-center text-gray-700">文档分析中，预计需要 1-2 分钟…</p>
+          <div className="mt-4 h-2 bg-gray-200 rounded overflow-hidden">
+            <div className="h-full bg-[#009e96] animate-progress" />
+          </div>
+        </div>
+      )}
+
+      {/* 分析结果 UI */}
+      {!loading && summary && (
+        <div className="w-full max-w-6xl flex flex-col items-center">
+          {/* 左上角标题 */}
+          <div className="w-full md:w-5/6 mb-2 text-left text-gray-700 font-semibold text-lg">
+            合同评审 - {file?.name}
+          </div>
+
+          {/* 分析结果区域 */}
           <div
             ref={outputRef}
-            className="whitespace-pre-wrap bg-white border rounded-lg p-4 shadow-inner
-                       max-h-[400px] overflow-y-auto text-sm text-gray-800"
+            className={`relative w-full md:w-5/6 rounded-lg bg-white px-6 py-4
+                        max-h-[600px] min-h-[350px] overflow-y-scroll text-[15px] leading-relaxed text-gray-800 no-scrollbar
+                        ${showBackToBottom ? 'pb-20' : ''}`}
+            onScroll={() => {
+              const el = outputRef.current
+              if (el) {
+                const nearBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 40
+                setShowBackToBottom(!nearBottom)
+              }
+            }}
           >
-            {messages.map((msg, idx) => (
-              <div key={idx} className="mb-3">
-                {msg.type === 'reasoning' && (
-                  <div className="border-l-4 border-gray-300 pl-3 text-gray-600">
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
-                  </div>
-                )}
-                {msg.type === 'message' && (
-                  <div className="bg-gray-100 p-3 rounded">
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
-                  </div>
-                )}
+            {/* 分析内容 */}
+            <MarkdownPreview source={summary} />
+
+            {/* 更往下的返回按钮 */}
+            {showBackToBottom && (
+              <div className="sticky bottom-4 ml-auto pr-4 pt-2 w-fit z-10 bg-white bg-opacity-80 rounded">
+                <button
+                  className="text-[#009e96] border border-gray-300 px-2.5 py-1 text-sm rounded-full shadow-sm hover:bg-gray-50"
+                  onClick={() => {
+                    outputRef.current?.scrollTo({
+                      top: outputRef.current.scrollHeight,
+                      behavior: 'smooth',
+                    })
+                  }}
+                >
+                  ⬇ 返回
+                </button>
               </div>
-            ))}
-            {loading && (
-              <div className="text-center text-gray-600">评审中，请稍候…</div>
             )}
           </div>
 
+
+
           {/* 操作按钮 */}
-          <div className="flex justify-between mt-4">
+          <div className="flex space-x-4 mt-4">
             <button
-              className="px-4 py-2 border border-[#009e96] text-[#009e96] rounded
-                         hover:bg-[#009e96]/10 transition"
+              className="px-4 py-2 border border-[#009e96] text-[#009e96] rounded hover:bg-[#009e96]/10 transition"
               onPointerDown={() => {
                 setFile(null)
-                setMessages([])
+                setSummary('')
               }}
             >
-              重新上传
+              继续评审
             </button>
             <button
-              className="px-4 py-2 bg-[#009e96] text-white rounded
-                         hover:bg-[#008a7c] transition"
+              className="px-4 py-2 bg-[#009e96] text-white rounded hover:bg-[#008a7c] transition"
               onPointerDown={() => {
-                const q = window.prompt('请输入您的问题：')
+                const q = window.prompt('请输入您想补充的问题：')
                 if (q) {
-                  // 可接入后端提问接口
-                  alert(`您的问题已提交：${q}`)
+                  alert(`补充问题已提交：${q}`)
                 }
               }}
             >
-              提问
+              评审内容补充
             </button>
           </div>
         </div>
