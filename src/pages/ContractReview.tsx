@@ -72,14 +72,14 @@ export default function ContractReview() {
   }, [summary])
 
   const truncateName = (name: string) => {
-    if (name.length <= 25) return name
+    if (name.length <= 15) return name
     const ext = name.slice(name.lastIndexOf('.'))
-    const base = name.slice(0, 20)
-    return base + '...' + ext
+    const base = name.slice(0, 15)
+    return base + '...'
   }
 
   return (
-    <div className="h-full flex flex-col items-center p-6 space-y-6">
+    <div className="h-full flex flex-col items-center pt-6 pb-6 space-y-6">
       {/* 顶部标题 */}
       {!summary && !loading && (
         <div className="text-center">
@@ -130,17 +130,18 @@ export default function ContractReview() {
 
       {/* 分析结果 UI */}
       {!loading && summary && (
-        <div className="w-full max-w-6xl flex flex-col items-center">
-          {/* 左上角标题 */}
-          <div className="w-full md:w-5/6 mb-2 text-left text-gray-700 font-semibold text-lg">
-            合同评审 - {file?.name}
-          </div>
+      <>
+        {/* 主视图左上角标题 */}
+        <div className="w-full max-w-7xl text-left text-gray-700 font-semibold text-lg mb-2 self-start md:pl-15 pl-15"        >
+          {truncateName(`合同评审 - ${file?.name}`)}
+        </div>
 
+        <div className="w-full max-w-6xl flex flex-col items-center">
           {/* 分析结果区域 */}
           <div
             ref={outputRef}
-            className={`relative w-full md:w-5/6 rounded-lg bg-white px-6 py-4
-                        max-h-[600px] min-h-[350px] overflow-y-scroll text-[15px] leading-relaxed text-gray-800 no-scrollbar
+            className={`relative w-full md:w-[90%] max-w-7xl rounded-lg bg-white px-8 py-6
+                        max-h-[700px] min-h-[400px] overflow-y-scroll text-[15px] leading-relaxed text-gray-800 no-scrollbar
                         ${showBackToBottom ? 'pb-20' : ''}`}
             onScroll={() => {
               const el = outputRef.current
@@ -197,7 +198,7 @@ export default function ContractReview() {
             </button>
           </div>
         </div>
-      )}
+      </>)}
     </div>
   )
 }
