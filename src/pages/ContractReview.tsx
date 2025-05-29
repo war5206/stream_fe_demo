@@ -26,7 +26,7 @@ export default function ContractReview() {
   useEffect(() => {
     if (!sessionId) return
     setLoading(true)
-    fetch(`http://127.0.0.1:8000/api/v1/message/session/${sessionId}`)
+    fetch(`http://127.0.0.1:9000/api/v1/message/session/${sessionId}`)
       .then(res => {
         if (!res.ok) throw new Error()
         return res.json()
@@ -95,7 +95,7 @@ export default function ContractReview() {
     try {
       console.log("rag contract formData: ", formData)
       const res = await fetch(
-        'http://127.0.0.1:8000/api/v1/contract/review',
+        'http://127.0.0.1:9000/api/v1/contract/review',
         { method: 'POST', body: formData }
       )
       const data = await res.json()
@@ -103,6 +103,43 @@ export default function ContractReview() {
       if (data.type === 'message') {
         setSummary(data.delta)
         navigate(`/agent/contract?session=${data.session_id}`, { replace: true })
+      }
+    } catch (err) {
+      console.error(err)
+      alert('请求失败，请稍后再试')
+    } finally {
+      setLoading(false)
+      setTimeout(() => {
+        outputRef.current?.scrollTo({
+          top: outputRef.current.scrollHeight
+        })
+      }, 0)
+    }
+  }
+
+  const multiReview = async () => {
+    if (!sessionId) {
+      alert('会话未初始化，无法继续评审')
+      return
+    }
+    const formData = new FormData()
+    formData.append('user_prompt', '请继续补充合同评审内容')
+    formData.append('user_id', '1')
+    formData.append('agent_id', '1')
+    formData.append('session_id', sessionId)
+    
+    setLoading(true)
+    
+    try {
+      console.log("rag contract formData: ", formData)
+      const res = await fetch(
+        'http://127.0.0.1:9000/api/v1/contract/multi-review',
+        { method: 'POST', body: formData }
+      )
+      const data = await res.json()
+      console.log("rag contract data: ", data)
+      if (data.type === 'message') {
+        setSummary(prev => prev + '\n\n' + data.delta)
       }
     } catch (err) {
       console.error(err)
@@ -228,8 +265,7 @@ export default function ContractReview() {
               <button
                 className="px-4 py-2 bg-[#009e96] text-white rounded hover:bg-[#008a7c] transition"
                 onPointerDown={() => {
-                  const q = window.prompt('请输入您想补充的问题：')
-                  if (q) alert(`补充问题已提交：${q}`)
+                  multiReview()
                 }}
               >
                 评审内容补充

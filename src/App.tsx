@@ -1,6 +1,6 @@
 // src/App.tsx
 import React, { useState, useEffect } from 'react'
-import { Routes, Route, useLocation } from 'react-router-dom'
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import Home from './pages/Home'
 import ContractReview from './pages/ContractReview'
@@ -10,13 +10,19 @@ import SalesConsult from './pages/SalesConsult'
 import UserProfile from './pages/UserProfile'
 import Favorites from './pages/Favorites'
 import Profile from './pages/Profile'
+import Login from './pages/Login'
+import { useAuth } from './contexts/AuthContext'
 
 const App: React.FC = () => {
   const location = useLocation()
-  // 如果在查看器页面，隐藏 Sidebar
+  const { token } = useAuth()
+
   const hideSidebar = location.pathname === '/agent/contract/view'
+  const isLoginPage = location.pathname === '/login'
 
   const [isCollapsed, setIsCollapsed] = useState(false)
+
+  
   useEffect(() => {
     const mql = window.matchMedia('(min-width: 768px)')
     const handler = (e: MediaQueryListEvent | MediaQueryList) =>
@@ -30,10 +36,23 @@ const App: React.FC = () => {
         ? mql.removeEventListener('change', handler)
         : mql.removeListener(handler)
   }, [])
-
   const toggleCollapse = (e: React.PointerEvent) => {
     e.stopPropagation()
     setIsCollapsed(prev => !prev)
+  }
+
+  // 🚫 若未登录并非 login 页面，跳转到 login
+  if (!token && !isLoginPage) {
+    return <Navigate to="/login" replace />
+  }
+
+  // ✅ 若访问 login 页面，渲染 login
+  if (!token && isLoginPage) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+      </Routes>
+    )
   }
 
   return (
@@ -54,7 +73,6 @@ const App: React.FC = () => {
           )}
         </>
       )}
-
       <main
         className={`
           flex-1 transition-all duration-300 ease-in-out
@@ -63,6 +81,7 @@ const App: React.FC = () => {
         `}
       >
         <Routes>
+          <Route path="/login" element={<Login />} />
           <Route path="/" element={<Home />} />
           <Route path="/agent/contract" element={<ContractReview />} />
           <Route path="/agent/bid"      element={<BidConsult />} />
