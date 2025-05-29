@@ -40,7 +40,7 @@ export default function Sidebar({ isCollapsed, onToggle }: Props) {
 
   // whenever URL search changes (新会话创建或 session 参数变化)，重新拉历史
   useEffect(() => {
-    fetch('http://127.0.0.1:9000/api/v1/session/user/1')
+    fetch('http://117.80.237.236:8001/api/v1/session/user/1')
       .then(res => res.json())
       .then((data: HistoryEntry[]) => setHistory(data))
       .catch(console.error)
@@ -49,7 +49,7 @@ export default function Sidebar({ isCollapsed, onToggle }: Props) {
   const handleRename = (id: number) => {
     const newTitle = prompt('请输入新会话标题')
     if (!newTitle) return
-    fetch(`http://127.0.0.1:9000/api/v1/session/${id}/1`, {
+    fetch(`http://117.80.237.236:8001/api/v1/session/${id}/1`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: newTitle })
@@ -64,7 +64,7 @@ export default function Sidebar({ isCollapsed, onToggle }: Props) {
   }
 
   const handleDelete = (id: number) => {
-    fetch(`http://127.0.0.1:9000/api/v1/session/${id}`, {
+    fetch(`http://117.80.237.236:8001/api/v1/session/${id}`, {
       method: 'DELETE'
     })
       .then(res => {

@@ -26,7 +26,7 @@ export default function ContractReview() {
   useEffect(() => {
     if (!sessionId) return
     setLoading(true)
-    fetch(`http://127.0.0.1:9000/api/v1/message/session/${sessionId}`)
+    fetch(`http://117.80.237.236:8001/api/v1/message/session/${sessionId}`)
       .then(res => {
         if (!res.ok) throw new Error()
         return res.json()
@@ -35,11 +35,16 @@ export default function ContractReview() {
         // console.log("msgs: ", msgs)
         const assistantText = msgs
           .filter(m => m.role === 'assistant')
-          .map(m => m.content)
+          .map(m => {
+            try {
+              const parsed = JSON.parse(m.content)
+              return parsed?.delta ?? parsed
+            } catch {
+              return m.content
+            }
+          })
           .join('\n\n')
-        // console.log("assistantText: ", assistantText)
-        // console.log("assistantText Obj: ", JSON.parse(assistantText))
-        setSummary(JSON.parse(assistantText).delta)
+        setSummary(assistantText)
       })
       .catch(err => {
         console.error(err)
@@ -95,7 +100,7 @@ export default function ContractReview() {
     try {
       console.log("rag contract formData: ", formData)
       const res = await fetch(
-        'http://127.0.0.1:9000/api/v1/contract/review',
+        'http://117.80.237.236:8001/api/v1/contract/review',
         { method: 'POST', body: formData }
       )
       const data = await res.json()
@@ -133,7 +138,7 @@ export default function ContractReview() {
     try {
       console.log("rag contract formData: ", formData)
       const res = await fetch(
-        'http://127.0.0.1:9000/api/v1/contract/multi-review',
+        'http://117.80.237.236:8001/api/v1/contract/multi-review',
         { method: 'POST', body: formData }
       )
       const data = await res.json()

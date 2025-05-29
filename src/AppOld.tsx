@@ -73,7 +73,7 @@ export default function ContractReviewPage() {
     setIsReasoningDone(false); // 思考开始
   
     try {
-      const res = await fetch("http://127.0.0.1:9000/api/v1/contract/review", {
+      const res = await fetch("http://117.80.237.236:8001/api/v1/contract/review", {
         method: "POST",
         body: formData,
       });
